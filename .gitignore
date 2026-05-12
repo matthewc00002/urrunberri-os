@@ -1,0 +1,5 @@
+node_modules/
+*.log
+.DS_Store
+iso/output/
+rootfs/build/
