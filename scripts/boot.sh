@@ -1,79 +1,45 @@
 #!/bin/bash
 # =============================================================================
 #  UrrunBerri OS — Boot Script
-#  Connects directly to the configured server — loops forever until login
+#  Login dialog with IP, Port, Username, Password
 #  Author : Mathieu Cadi — Openema SARL
 # =============================================================================
 
 CONFIG="/etc/urrunberri-os/config.conf"
 [[ -f "$CONFIG" ]] && source "$CONFIG"
 
-# Defaults
-PROTOCOL="${PROTOCOL:-rdp}"
-HOST="${HOST:-192.168.1.10}"
-PORT="${PORT:-3389}"
-USERNAME="${USERNAME:-Administrateur}"
-PASSWORD="${PASSWORD:-}"
-DOMAIN="${DOMAIN:-}"
 RESOLUTION="${RESOLUTION:-1920x1080}"
-LANG="${LANG:-fr}"
-RDP_RECONNECT="${RDP_RECONNECT:-true}"
-
-# Messages
-declare -A MSG
-MSG[fr]="Connexion en cours..."
-MSG[en]="Connecting..."
-MSG[es]="Conectando..."
-MSG[eu]="Konektatzen..."
-
-log() { echo "[UrrunBerri OS] $*"; }
-
-# Allow display access
 DISPLAY="${DISPLAY:-:0}"
+
 xhost + >/dev/null 2>&1 || true
-
-log "${MSG[$LANG]:-Connecting...}"
-log "Protocole: $PROTOCOL | Serveur: $HOST:$PORT | Utilisateur: $USERNAME"
-
-# Set dark background
 xsetroot -solid "#0d2233" 2>/dev/null || true
 
-# ── MAIN LOOP — retries forever ───────────────────────────────────────────────
+show_login() {
+    RESULT=$(DISPLAY=$DISPLAY zenity --forms \
+        --title="UrrunBerri OS" \
+        --text="Connexion RDP" \
+        --add-entry="IP" \
+        --add-entry="Port" \
+        --add-entry="Utilisateur" \
+        --add-password="Mot de passe" \
+        --ok-label="Connexion" \
+        --width=360 2>/dev/null)
+    [[ $? -ne 0 ]] && return 1
+    CONN_HOST=$(echo "$RESULT" | cut -d'|' -f1)
+    CONN_PORT=$(echo "$RESULT" | cut -d'|' -f2)
+    USERNAME=$(echo "$RESULT" | cut -d'|' -f3)
+    PASSWORD=$(echo "$RESULT" | cut -d'|' -f4)
+    [[ -z "$CONN_HOST" ]] && return 1
+    [[ -z "$CONN_PORT" ]] && CONN_PORT=3389
+    return 0
+}
+
 while true; do
-    case "$PROTOCOL" in
-        rdp)
-            ARGS=(
-                "/v:${HOST}:${PORT}"
-                "/u:${USERNAME}"
-                "/size:${RESOLUTION}"
-                "/cert:ignore"
-                "/clipboard"
-                "/fonts"
-                "/log-level:ERROR"
-            )
-            [[ -n "$PASSWORD" ]] && ARGS+=("/p:${PASSWORD}")
-            [[ -n "$DOMAIN" ]]   && ARGS+=("/d:${DOMAIN}")
-
-            DISPLAY=$DISPLAY xfreerdp "${ARGS[@]}"
-            ;;
-
-        vnc)
-            DISPLAY=$DISPLAY vncviewer "${HOST}:${PORT}" 2>/dev/null
-            ;;
-
-        ssh)
-            DISPLAY=$DISPLAY xterm -fullscreen -e "ssh ${USERNAME}@${HOST} -p ${PORT}" 2>/dev/null
-            ;;
-
-        web)
-            URL="$HOST"
-            [[ "$URL" != http* ]] && URL="https://${URL}"
-            DISPLAY=$DISPLAY firefox --kiosk "$URL" 2>/dev/null
-            ;;
-    esac
-
-    # After disconnect — show dark background and retry
     xsetroot -solid "#0d2233" 2>/dev/null || true
-    log "Déconnecté. Reconnexion dans 5 secondes..."
-    sleep 5
+    if ! show_login; then sleep 2; continue; fi
+    echo "[UrrunBerri OS] Connexion a ${CONN_HOST}:${CONN_PORT} en tant que ${USERNAME}..."
+    DISPLAY=$DISPLAY xfreerdp /v:${CONN_HOST}:${CONN_PORT} /u:${USERNAME} /p:${PASSWORD} \
+        /size:${RESOLUTION} /cert:ignore /clipboard /fonts /log-level:ERROR
+    echo "[UrrunBerri OS] Deconnecte. Retour a l'ecran de connexion..."
+    sleep 3
 done

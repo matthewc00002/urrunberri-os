@@ -1,7 +1,7 @@
 #!/bin/bash
 # =============================================================================
 #  UrrunBerri OS — Install Script
-#  Transforms any Debian 12 / Ubuntu 22.04+ PC into a ThinStation-like thin client
+#  Transforms any Debian 13 / Ubuntu 24.04+ PC into a ThinStation-like thin client
 #  One config file → boots directly into one connection
 #
 #  Usage: sudo bash install.sh [OPTIONS]
